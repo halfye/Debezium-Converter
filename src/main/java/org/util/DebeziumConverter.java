@@ -1,10 +1,14 @@
-package org.util;
+package org.myrs.consumer.util;
 
 import io.debezium.spi.converter.CustomConverter;
 import io.debezium.spi.converter.RelationalColumn;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Properties;
 
@@ -19,6 +23,8 @@ public class DebeziumConverter implements CustomConverter<SchemaBuilder, Relatio
     private SchemaBuilder schemaBuilder;
     private String databaseType;
     private String schemaNamePrefix;
+    // 获取默认时区
+    private final ZoneId zoneId = ZoneOffset.systemDefault();
 
 
     @Override
@@ -81,10 +87,20 @@ public class DebeziumConverter implements CustomConverter<SchemaBuilder, Relatio
                     } else if (value instanceof java.time.LocalDateTime) {
                         return datetimeFormatter.format((java.time.LocalDateTime) value);
                     } else if (value instanceof java.time.ZonedDateTime) {
-                        return datetimeFormatter.format(((java.time.ZonedDateTime) value).toLocalDateTime());
+                        // 获取系统默认时区
+//                        ZoneOffset zoneOffset = java.time.ZoneId.systemDefault().getRules().getOffset(java.time.Instant.now());
+//                        return datetimeFormatter.format(((java.time.ZonedDateTime) value).withZoneSameInstant(zoneOffset).toLocalDateTime());
+                        return datetimeFormatter.format(((java.time.ZonedDateTime) value).withZoneSameInstant(zoneId).toLocalDateTime());
+
                     } else if (value instanceof java.sql.Timestamp) {
                         return datetimeFormatter.format(((java.sql.Timestamp) value).toLocalDateTime());
-                    } else {
+                    } else if (value instanceof java.lang.String) {
+                        // 初始化出现1970-01-01T00:00:00Zd的值，需要转换
+                        Instant instant = Instant.parse((String) value);
+                        java.time.LocalDateTime dateTime = java.time.LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+                        return datetimeFormatter.format(dateTime);
+                    }
+                    else {
                         return this.failConvert(value, schemaName);
                     }
                 });
@@ -134,8 +150,11 @@ public class DebeziumConverter implements CustomConverter<SchemaBuilder, Relatio
                     } else if (value instanceof java.sql.Timestamp) {
                         return datetimeFormatter.format(((java.sql.Timestamp) value).toLocalDateTime());
                     } else if (value instanceof microsoft.sql.DateTimeOffset) {
+//                        return datetimeFormatter.format(
+//                                ((microsoft.sql.DateTimeOffset) value).getOffsetDateTime().toLocalDateTime());
+                        microsoft.sql.DateTimeOffset dateTimeOffset = (microsoft.sql.DateTimeOffset) value;
                         return datetimeFormatter.format(
-                                ((microsoft.sql.DateTimeOffset) value).getOffsetDateTime().toLocalDateTime());
+                                dateTimeOffset.getOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
                     } else {
                         return this.failConvert(value, schemaName);
                     }
@@ -158,7 +177,7 @@ public class DebeziumConverter implements CustomConverter<SchemaBuilder, Relatio
         } else if (this.databaseType.equals("sqlserver")) {
             this.registerSqlserverConverter(columnType, converterRegistration);
         } else {
-            log.warn("不支持的数据库类型: {}", this.databaseType);
+            log.warn("===failed 不支持的数据库类型: {}", this.databaseType);
             schemaBuilder = null;
         }
     }
@@ -174,7 +193,7 @@ public class DebeziumConverter implements CustomConverter<SchemaBuilder, Relatio
     private String failConvert(Object value, String type) {
         String valueClass = this.getClassName(value);
         String valueString = valueClass==null?null:value.toString();
-        log.warn("{}类型转换失败，类型：{}，值：{}", type, valueClass, valueString);
+        log.warn("===failed {}类型转换失败，类型：{}，值：{}", type, valueClass, valueString);
         return valueString;
     }
 }

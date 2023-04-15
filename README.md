@@ -1,3 +1,7 @@
+## 新修复项目
+1.修复mysql、sqerver的时间转换时区问题。（读取默认时区）
+2.修复mysql的timestamp类型，出现1970-01-01T00:00:00Zd的String类型问题。
+
 ## 使用方法
 `converters`参数为：自定义转换器的名字，可以随意设置。设置的值就作为转换器的名字，在以后的参数中就要使用这个名字。
 
@@ -43,12 +47,12 @@ debeziumProperties.put("mydebeziumconverter.format.time", "HH:mm:ss");
 ### mysql转换
 mysql启动时，快照期间初始化转换器，在binlog期间仍进行一次初始化转换器。（使用的类不同）
 
-|   字段类型    |     快照类型(jdbc type)      |      binlog类型(jdbc type)      |   
-|:---------:|:------------------------:|:-----------------------------:|
-|   DATE    | java.time.LocalDate(93)  |    java.time.LocalDate(91)    |  
-|   TIME    |  java.time.Duration(92)  |    java.time.Duration(92)     |  
-| DATETIME  |  java.sql.Timestamp(93)  |  java.time.LocalDateTime(93)  |
-| TIMESTAMP | java.sql.Timestamp(2014) | java.time.ZonedDateTime(2014) |
+|   字段类型    |                   快照类型(jdbc type)                   |      binlog类型(jdbc type)      |   
+|:---------:|:---------------------------------------------------:|:-----------------------------:|
+|   DATE    |               java.time.LocalDate(93)               |    java.time.LocalDate(91)    |  
+|   TIME    |               java.time.Duration(92)                |    java.time.Duration(92)     |  
+| DATETIME  |               java.sql.Timestamp(93)                |  java.time.LocalDateTime(93)  |
+| TIMESTAMP | java.sql.Timestamp(2014)<br/>java.lang.String(2014) | java.time.ZonedDateTime(2014) |
 
 ### sqlserver转换
 sqlserver启动时 快照期间初始化转换器，在cdc期间不再进行初始化转换器。（使用的类相同）
